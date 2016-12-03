@@ -1,0 +1,239 @@
+---
+title: 'Rowvember'
+author: 'Joseph V. Casillas'
+date: '`r Sys.time()`'
+output: 
+  html_notebook: 
+    theme: cosmo
+---
+
+
+# Load packages 
+
+
+```{r, message=FALSE, warning=FALSE}
+library(ggplot2); library(dplyr); library(tidyr) 
+library(plot3D); library(plotly); library(lme4)
+library(lmerTest); library(MuMIn); library(DT)
+library(stargazer)
+```
+
+
+# Initial setup and data loading
+
+
+```{r, eval=FALSE}
+# clean working directory
+rm(list = ls(all = TRUE))
+
+# Set working directory
+setwd("~/code/r/rowvember/")
+```
+
+```{r}
+# Individual data
+df_individual <- read.csv("./data/rowvember.csv", header = TRUE, quote = "")
+
+# Add to dataframe
+# df_individual <- rbind(df_individual, 
+#   data.frame(rower = 'joseph', 
+#              trial = 4, 
+#              time = 5, 
+#              distance = 1549))
+
+# Save to file
+# write.table(df_individual, "./data/rowvember.csv", row.names = F, quote = F, sep = ",")
+
+# Load all data
+temp <- list.files(path = "./data/", full.names = TRUE, pattern = ".csv")
+myfiles = lapply(temp[-1], read.csv, sep = ",")
+df <- do.call("rbind", myfiles)
+
+df <- mutate(df, 
+             trial = as.factor(trial), 
+             time = as.numeric(time), 
+             distance = as.numeric(distance))
+str(df)
+```
+
+
+
+# Analysis and plots
+
+## Individual data
+
+
+```{r, results='asis'}
+# Total meters
+df_individual %>%
+  summarize(., sum(distance)) %>%
+  datatable(.)
+```
+
+```{r}
+# Total meters per week 
+df_individual %>%
+  group_by(., time) %>%
+  summarise(., sum(distance)) %>% 
+  datatable(.)
+```
+
+```{r}
+# Calculate mean value per time session and fit uncon. GCA 
+# Create higher order orthogonal polynomial
+df_individual <- as.data.frame(df_individual)
+t <- poly(unique(df_individual$time), 2)
+df_individual[df_individual$time == 2, 'ot1'] <- t[1, 1]
+df_individual[df_individual$time == 3, 'ot1'] <- t[2, 1]
+df_individual[df_individual$time == 4, 'ot1'] <- t[3, 1]
+df_individual[df_individual$time == 5, 'ot1'] <- t[4, 1]
+df_individual[df_individual$time == 2, 'ot2'] <- t[1, 2]
+df_individual[df_individual$time == 3, 'ot2'] <- t[2, 2]
+df_individual[df_individual$time == 4, 'ot2'] <- t[3, 2]
+df_individual[df_individual$time == 5, 'ot2'] <- t[4, 2]
+
+fit <- lmer(distance ~ (ot1+ot2) + ((ot1+ot2) | trial), data = df_individual, REML = FALSE)
+summary(fit)
+```
+
+```{r, fig.retina=2, fig.align='center', fig.width=8}
+# Plot avg distance for each time 
+df_individual %>%
+  ggplot(., aes(x = time, y = distance)) + 
+  stat_summary(fun.data = mean_se, geom = 'errorbar', width = 0.1) + 
+  stat_summary(fun.y = mean, geom = 'point', color = 'darkred', size = 2) + 
+  stat_summary(fun.y = mean, geom = 'point', color = 'darkgrey', size = 1.25) + 
+  stat_summary(aes(y = fitted(fit)), fun.y = mean, geom = 'line') + 
+  scale_x_continuous(breaks = c(2, 3, 4, 5), 
+                     labels = c('2min', '3min', '4min', '5min')) +
+  xlab('Time interval') + ylab('Average distance (m)') + 
+  theme_bw()
+```
+
+
+```{r, fig.height=7, fig.width=10, fig.retina=2, fig.align='center'}
+# 3D plot 
+with(df_individual, scatter3D(x = trial, y = time, z = distance, 
+     colvar = distance, pch = 19, cex = 0.5, phi = 10, bty = 'g', 
+     type = 'h', ticktype = "detailed", xlab = 'Trial', ylab = 'Time', 
+     zlab = 'Distame (m)', zlim = c(0, 1800), xlim = c(0, 4.2), 
+     ylim = c(1.8, 5.2), col = gg.col(100)))
+```
+
+
+
+
+
+
+
+
+
+# Group data
+
+```{r}
+# Total meters (female)
+df %>%
+  filter(., group == 'female') %>%
+  group_by(., athlete, group) %>%
+  summarise(., totalM = sum(distance)) %>%
+  arrange(., group, desc(totalM)) %>%
+  as.data.frame(.) %>%
+  datatable(.)
+```
+
+```{r}
+# Total meters (male)
+df %>%
+  filter(., group == 'male') %>%
+  group_by(., athlete, group) %>%
+  summarise(., totalM = sum(distance)) %>%
+  arrange(., group, desc(totalM)) %>%
+  as.data.frame(.) %>%
+  datatable(.)
+```
+
+```{r}
+# Total meters by time
+df %>%
+  group_by(., athlete, group, time) %>%
+  summarise(., totalM = sum(distance)) %>%
+  arrange(., group, desc(totalM)) %>%
+  by(., .[c("group", "time")], head, n = 10)
+```
+  
+```{r}
+# Avg meters by gender 
+df %>%
+  group_by(., athlete, group) %>%
+  summarise(., totalM = sum(distance)) %>%
+  group_by(., group) %>%
+  summarise(., avg = round(mean(totalM), 2)) %>%
+  datatable(.)
+```
+
+```{r, fig.align='center', fig.width=8, fig.retina=2}
+# Plot total meters of top 10 overall
+df %>%
+  group_by(., athlete, group) %>%
+  summarise(., totalM = sum(distance)) %>%
+  arrange(., group, desc(totalM)) %>%
+  by(., .["group"], head, n = 10) %>%
+  Reduce(rbind, .) %>%
+  ggplot(., aes(x = group, y = totalM, label = athlete, colour = group)) + 
+  stat_summary(fun.data = mean_cl_boot, geom = 'errorbar', width = 0.2) + 
+  stat_summary(fun.y = mean, geom = 'point', color = 'Black') + 
+  geom_text(alpha = 0.4) + 
+  scale_color_brewer(palette = 'Set1', guide = FALSE) + 
+  theme_bw()
+```
+
+```{r, fig.align='center', fig.width=10, fig.retina=2}
+# Plot top 10 in each trial 
+df %>%
+  group_by(., athlete, group, trial, time) %>%
+  arrange(., group, trial, time, desc(distance)) %>%
+  by(., .[c("group", "trial", "time")], head, n = 10) %>%
+  Reduce(rbind, .) %>%
+  ggplot(., aes(x = trial, y = distance, shape = group, label = athlete)) + 
+  facet_grid(. ~ time) + 
+  stat_summary(aes(colour = group), fun.data = mean_cl_normal, geom = 'errorbar', width = 0.2) + 
+  stat_summary(fun.y = mean, geom = 'point') + 
+  geom_text(aes(colour = group), alpha = 0.3) + 
+  scale_color_brewer(palette = 'Set1', guide = FALSE) + 
+  theme_bw()
+```
+
+```{r, fig.align='center', fig.width=8, fig.retina=2, warning=FALSE}
+# Build some models 
+df$timeCentered <- df$time - mean(df$time)
+df$trial <- as.numeric(df$trial)
+fit_null <- lmer(distance ~ 1 + (time | athlete) + (trial | athlete), data = df, REML = FALSE)
+fit_1    <- lmer(distance ~ 1 + time + (time | athlete) + (trial | athlete), data = df, REML = FALSE)
+fit_2    <- lmer(distance ~ 1 + time + group + (time | athlete) + (trial | athlete), data = df, REML = FALSE)
+fit_full <- lmer(distance ~ 1 + time * group + (time | athlete) + (trial | athlete), data = df, REML = FALSE)
+anova(fit_null, fit_1, fit_2, fit_full, test = 'Chisq')
+summary(fit_full)
+r.squaredGLMM(fit_full)
+
+
+df %>%
+  ggplot(., aes(x = time, y = distance, colour = group, shape = group)) + 
+  geom_jitter(alpha = 0.4) + 
+  stat_summary(aes(y = fitted(fit_full)), fun.y = mean, geom = 'line') + 
+  stat_summary(fun.data = mean_cl_boot, geom = 'pointrange') +
+  stat_summary(fun.y = mean, geom = 'point', color = 'black') + 
+  scale_color_brewer(palette = 'Set1') + 
+  theme_bw()
+```
+
+```{r, fig.height=7, fig.width=10, fig.retina=2, fig.align='center'}
+with(df, scatter3D(x = trial, y = time, z = distance, 
+     col.var = distance, pch = 19, cex = 0.5, phi = 10, bty = 'g', 
+     type = 'p', ticktype = "detailed", xlab = 'Trial', ylab = 'Time', 
+     zlab = 'Distame (m)', zlim = c(0, 1500), xlim = c(0, 4.2), 
+     ylim = c(1.8, 5.2), col = gg.col(100)))
+```
+
+
+
+
