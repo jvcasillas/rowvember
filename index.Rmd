@@ -3,8 +3,10 @@ title: 'Rowvember'
 author: 'Joseph V. Casillas'
 date: '`r Sys.time()`'
 output: 
-  html_notebook: 
+  html_document:
+    number_sections: yes
     theme: cosmo
+    toc: yes
 ---
 
 
@@ -31,7 +33,7 @@ rm(list = ls(all = TRUE))
 setwd("~/code/r/rowvember/")
 ```
 
-```{r}
+```{r, echo=FALSE}
 # Individual data
 df_individual <- read.csv("./data/rowvember.csv", header = TRUE, quote = "")
 
@@ -54,6 +56,7 @@ df <- mutate(df,
              trial = as.factor(trial), 
              time = as.numeric(time), 
              distance = as.numeric(distance))
+df <- df[-244, ]      
 str(df)
 ```
 
@@ -63,6 +66,7 @@ str(df)
 
 ## Individual data
 
+### Total meters for November
 
 ```{r, results='asis'}
 # Total meters
@@ -70,6 +74,8 @@ df_individual %>%
   summarize(., sum(distance)) %>%
   datatable(.)
 ```
+
+### Total meters per week
 
 ```{r}
 # Total meters per week 
@@ -79,7 +85,9 @@ df_individual %>%
   datatable(.)
 ```
 
-```{r}
+### Fit model of meters as a function of time
+
+```{r, echo=FALSE, output='hide'}
 # Calculate mean value per time session and fit uncon. GCA 
 # Create higher order orthogonal polynomial
 df_individual <- as.data.frame(df_individual)
@@ -96,6 +104,8 @@ df_individual[df_individual$time == 5, 'ot2'] <- t[4, 2]
 fit <- lmer(distance ~ (ot1+ot2) + ((ot1+ot2) | trial), data = df_individual, REML = FALSE)
 summary(fit)
 ```
+
+### Plots of meters as a function of time
 
 ```{r, fig.retina=2, fig.align='center', fig.width=8}
 # Plot avg distance for each time 
@@ -129,9 +139,11 @@ with(df_individual, scatter3D(x = trial, y = time, z = distance,
 
 
 
-# Group data
+## Group data
 
-```{r}
+### Total meters (females)
+
+```{r, echo=FALSE}
 # Total meters (female)
 df %>%
   filter(., group == 'female') %>%
@@ -142,7 +154,9 @@ df %>%
   datatable(.)
 ```
 
-```{r}
+### Total meters (males)
+
+```{r, echo=FALSE}
 # Total meters (male)
 df %>%
   filter(., group == 'male') %>%
@@ -153,7 +167,9 @@ df %>%
   datatable(.)
 ```
 
-```{r}
+### Total meters as a function of time
+
+```{r, echo=FALSE}
 # Total meters by time
 df %>%
   group_by(., athlete, group, time) %>%
@@ -161,8 +177,10 @@ df %>%
   arrange(., group, desc(totalM)) %>%
   by(., .[c("group", "time")], head, n = 10)
 ```
-  
-```{r}
+
+### Avg. meters by gender 
+
+```{r, echo=FALSE}
 # Avg meters by gender 
 df %>%
   group_by(., athlete, group) %>%
@@ -172,7 +190,9 @@ df %>%
   datatable(.)
 ```
 
-```{r, fig.align='center', fig.width=8, fig.retina=2}
+### Plot of total meters for top 10 overall
+
+```{r, fig.align='center', fig.width=8, fig.retina=2, echo=FALSE}
 # Plot total meters of top 10 overall
 df %>%
   group_by(., athlete, group) %>%
@@ -188,7 +208,9 @@ df %>%
   theme_bw()
 ```
 
-```{r, fig.align='center', fig.width=10, fig.retina=2}
+### Plot of top 10 in each trial 
+
+```{r, fig.align='center', fig.width=10, fig.retina=2, echo=FALSE}
 # Plot top 10 in each trial 
 df %>%
   group_by(., athlete, group, trial, time) %>%
@@ -204,7 +226,7 @@ df %>%
   theme_bw()
 ```
 
-```{r, fig.align='center', fig.width=8, fig.retina=2, warning=FALSE}
+```{r, fig.align='center', fig.width=8, fig.retina=2, warning=FALSE, echo=FALSE, results='hide'}
 # Build some models 
 df$timeCentered <- df$time - mean(df$time)
 df$trial <- as.numeric(df$trial)
@@ -227,7 +249,7 @@ df %>%
   theme_bw()
 ```
 
-```{r, fig.height=7, fig.width=10, fig.retina=2, fig.align='center'}
+```{r, fig.height=7, fig.width=10, fig.retina=2, fig.align='center', echo=FALSE}
 with(df, scatter3D(x = trial, y = time, z = distance, 
      col.var = distance, pch = 19, cex = 0.5, phi = 10, bty = 'g', 
      type = 'p', ticktype = "detailed", xlab = 'Trial', ylab = 'Time', 
