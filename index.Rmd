@@ -12,8 +12,6 @@ output:
 
 # Load packages 
 
-
-
 ```{r, message=FALSE, warning=FALSE}
 library(plot3D)
 library(plotly)
