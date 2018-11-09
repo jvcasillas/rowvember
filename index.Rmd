@@ -15,27 +15,24 @@ output:
 
 
 ```{r, message=FALSE, warning=FALSE}
-library(ggplot2); library(dplyr); library(tidyr) 
-library(plot3D); library(plotly); library(lme4)
-library(lmerTest); library(MuMIn); library(DT)
+library(plot3D)
+library(plotly)
+library(lme4)
+library(lmerTest)
+library(MuMIn)
+library(DT)
 library(stargazer)
+library(here)
+library(tidyverse)
 ```
 
 
 # Initial setup and data loading
 
 
-```{r, eval=FALSE}
-# clean working directory
-rm(list = ls(all = TRUE))
-
-# Set working directory
-setwd("~/code/r/rowvember/")
-```
-
 ```{r, echo=FALSE}
 # Individual data
-df_individual <- read.csv("./data/rowvember.csv", header = TRUE, quote = "")
+df_individual <- read_csv("./data/rowvember.csv")
 
 # Add to dataframe
 # df_individual <- rbind(df_individual, 
@@ -71,7 +68,8 @@ str(df)
 ```{r, results='asis'}
 # Total meters
 df_individual %>%
-  summarize(., sum(distance)) %>%
+  group_by(rower, year) %>% 
+  summarize(., total = sum(distance)) %>%
   datatable(.)
 ```
 
@@ -80,8 +78,9 @@ df_individual %>%
 ```{r}
 # Total meters per week 
 df_individual %>%
-  group_by(., time) %>%
-  summarise(., sum(distance)) %>% 
+  group_by(., rower, year, time) %>%
+  summarise(., total = sum(distance)) %>% 
+  spread(., year, total) %>%
   datatable(.)
 ```
 
@@ -101,7 +100,7 @@ df_individual[df_individual$time == 3, 'ot2'] <- t[2, 2]
 df_individual[df_individual$time == 4, 'ot2'] <- t[3, 2]
 df_individual[df_individual$time == 5, 'ot2'] <- t[4, 2]
 
-fit <- lmer(distance ~ (ot1+ot2) + ((ot1+ot2) | trial), data = df_individual, REML = FALSE)
+fit <- lmer(distance ~ (ot1+ot2) + year + ((ot1+ot2) | trial), data = df_individual, REML = FALSE)
 summary(fit)
 ```
 
@@ -110,16 +109,18 @@ summary(fit)
 ```{r, fig.retina=2, fig.align='center', fig.width=8}
 # Plot avg distance for each time 
 df_individual %>%
-  ggplot(., aes(x = time, y = distance)) + 
-  stat_summary(fun.data = mean_se, geom = 'errorbar', width = 0.1) + 
-  stat_summary(fun.y = mean, geom = 'point', color = 'darkred', size = 2) + 
-  stat_summary(fun.y = mean, geom = 'point', color = 'darkgrey', size = 1.25) + 
+  ggplot(., aes(x = time, y = distance, color = as.factor(year), dodge = year)) + 
+  geom_point(position = position_dodge(0.5), size = 4, alpha = 0.3) + 
+  stat_summary(fun.data = mean_sdl, geom = 'pointrange', position = position_dodge(0.5)) + 
+  stat_summary(fun.y = mean, geom = 'point', size = 2, position = position_dodge(0.5)) + 
   stat_summary(aes(y = fitted(fit)), fun.y = mean, geom = 'line') + 
   scale_x_continuous(breaks = c(2, 3, 4, 5), 
                      labels = c('2min', '3min', '4min', '5min')) +
   xlab('Time interval') + ylab('Average distance (m)') + 
   theme_bw()
 ```
+
+
 
 
 ```{r, fig.height=7, fig.width=10, fig.retina=2, fig.align='center'}
