@@ -34,10 +34,10 @@ df_individual <- read_csv("./data/rowvember.csv")
 
 # Add to dataframe
 # df_individual <- rbind(df_individual, 
-#   data.frame(rower = 'joseph', 
+#   data_frame(rower = 'joseph', 
 #              trial = 4, 
-#              time = 5, 
-#              distance = 1549))
+#              time = 2, 
+#              distance = 663))
 
 # Save to file
 # write.table(df_individual, "./data/rowvember.csv", row.names = F, quote = F, sep = ",")
