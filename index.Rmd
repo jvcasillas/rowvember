@@ -7,6 +7,8 @@ output:
     number_sections: yes
     theme: cosmo
     toc: yes
+editor_options: 
+  chunk_output_type: console
 ---
 
 
@@ -82,6 +84,16 @@ df_individual %>%
   datatable(.)
 ```
 
+### Average meters per round
+
+```{r}
+df_individual %>% 
+	group_by(., rower, time) %>% 
+	summarize(., avg_distance = mean(distance), sd_distance = sd(distance)) %>% 
+	mutate_if(., is.numeric, round, digits = 2) %>% 
+	datatable(.)
+```
+
 ### Fit model of meters as a function of time
 
 ```{r, echo=FALSE, output='hide'}
@@ -98,7 +110,10 @@ df_individual[df_individual$time == 3, 'ot2'] <- t[2, 2]
 df_individual[df_individual$time == 4, 'ot2'] <- t[3, 2]
 df_individual[df_individual$time == 5, 'ot2'] <- t[4, 2]
 
-fit <- lmer(distance ~ (ot1+ot2) + year + ((ot1+ot2) | trial), data = df_individual, REML = FALSE)
+fit <- lmer(distance ~ (ot1+ot2) + year + 
+           ((ot1+ot2) | trial) + 
+           ((ot1 + ot2) | year), 
+            data = df_individual, REML = FALSE)
 summary(fit)
 ```
 
@@ -109,11 +124,14 @@ summary(fit)
 df_individual %>%
   ggplot(., aes(x = time, y = distance, color = as.factor(year), dodge = year)) + 
   geom_point(position = position_dodge(0.5), size = 4, alpha = 0.3) + 
-  stat_summary(fun.data = mean_sdl, geom = 'pointrange', position = position_dodge(0.5)) + 
-  stat_summary(fun.y = mean, geom = 'point', size = 2, position = position_dodge(0.5)) + 
+  stat_summary(fun.data = mean_sdl, geom = 'pointrange', 
+  						 position = position_dodge(0.5)) + 
+  stat_summary(fun.y = mean, geom = 'point', size = 2, 
+  						 position = position_dodge(0.5)) + 
   stat_summary(aes(y = fitted(fit)), fun.y = mean, geom = 'line') + 
   scale_x_continuous(breaks = c(2, 3, 4, 5), 
                      labels = c('2min', '3min', '4min', '5min')) +
+	ylim(500, 1700) + 
   xlab('Time interval') + ylab('Average distance (m)') + 
   theme_bw()
 ```
