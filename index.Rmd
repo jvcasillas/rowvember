@@ -24,6 +24,7 @@ library(DT)
 library(stargazer)
 library(here)
 library(tidyverse)
+library(magrittr)
 ```
 
 
@@ -57,15 +58,28 @@ df <- df[-244, ]
 str(df)
 ```
 
+```{r, 'plot-setup', echo=F}
+my_theme <- function() {
+  theme_minimal() + 
+    theme(
+      plot.title = element_text(size = rel(1), face = "bold"), 
+      plot.subtitle = element_text(size = rel(0.9)),
+      plot.caption = element_text(color = "#777777", vjust = 0),
+      axis.title = element_text(size = rel(.9), hjust = 0.95, face = "italic"), 
+      panel.grid.major = element_line(size = rel(.1), color = "grey70"), 
+      panel.grid.minor = element_line(size = rel(.1), color = "grey70")
+    )
+}
+```
 
 
 # Analysis and plots
 
 ## Individual data
 
-### Total meters for November
+### Total meters for Rowvember by year
 
-```{r, results='asis'}
+```{r, 'total-meters-by-year', results='asis', echo=F}
 # Total meters
 df_individual %>%
   group_by(rower, year) %>% 
@@ -73,15 +87,48 @@ df_individual %>%
   datatable(.)
 ```
 
-### Total meters per week
+### Total meters per week (row time)
 
-```{r}
+```{r, 'total-meters-weekly', echo=F}
 # Total meters per week 
 df_individual %>%
   group_by(., rower, year, time) %>%
   summarise(., total = sum(distance)) %>% 
   spread(., year, total) %>%
   datatable(.)
+```
+
+### Yearly improvement
+
+```{r, 'yearly-improvement-table', echo=F, warning=F, fig.retina=2, fig.width=7, fig.align="center"}
+df_individual %>% 
+  group_by(., rower, year, time) %>% 
+  summarise(., total = sum(distance)) %>% 
+  spread(., year, total) %>% 
+  mutate(., `16-17 difference` = `2017` - `2016`, 
+            `17-18 difference` = `2018` - `2017`) %>% 
+  select(., rower, time, starts_with("1")) %>% 
+  datatable(.)
+
+df_individual %>% 
+  group_by(., rower, year, time) %>% 
+  summarise(., total = sum(distance)) %>% 
+  spread(., year, total) %>% 
+  mutate(., `16-17 difference` = `2017` - `2016`, 
+            `17-18 difference` = `2018` - `2017`) %>% 
+  select(., rower, time, starts_with("1")) %>% 
+  gather(., year, diff, -rower, -time) %>% 
+  ggplot(., aes(x = year, y = diff, dodge = factor(time), 
+                fill = factor(time))) + 
+    geom_hline(yintercept = 0, lty = 3, color = "black") + 
+    geom_bar(stat = "identity", width = 0.2, fill = "grey60", 
+             position = position_dodge(0.5)) + 
+    geom_point(pch = 21, size = 7, position = position_dodge(0.5)) + 
+    scale_fill_brewer(name = "Row time\n(minutes)", palette = "Set1") + 
+    labs(y = "Overall distance (m) difference", 
+         x = "", title = "Rowvember yearly improvement", 
+         subtitle = "Difference between 2016/17 and 2017/18 total distances for 2, 3, 4, and 5 minute rows") + 
+    my_theme()
 ```
 
 ### Average meters per round
