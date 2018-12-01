@@ -11,10 +11,7 @@ editor_options:
   chunk_output_type: console
 ---
 
-
-# Load packages 
-
-```{r, message=FALSE, warning=FALSE}
+```{r, echo=FALSE, message=FALSE, warning=FALSE}
 library(plot3D)
 library(plotly)
 library(lme4)
@@ -25,13 +22,12 @@ library(stargazer)
 library(here)
 library(tidyverse)
 library(magrittr)
+library(knitr)
+library(kableExtra)
+library(magrittr)
 ```
 
-
-# Initial setup and data loading
-
-
-```{r, echo=FALSE}
+```{r, echo=FALSE, message=FALSE}
 # Individual data
 df_individual <- read_csv("./data/rowvember.csv")
 
@@ -55,17 +51,16 @@ df <- mutate(df,
              time = as.numeric(time), 
              distance = as.numeric(distance))
 df <- df[-244, ]      
-str(df)
 ```
 
 ```{r, 'plot-setup', echo=F}
 my_theme <- function() {
   theme_minimal() + 
     theme(
-      plot.title = element_text(size = rel(1), face = "bold"), 
-      plot.subtitle = element_text(size = rel(0.9)),
+      plot.title = element_text(size = rel(1.5), face = "bold"), 
+      plot.subtitle = element_text(size = rel(1)),
       plot.caption = element_text(color = "#777777", vjust = 0),
-      axis.title = element_text(size = rel(.9), hjust = 0.95, face = "italic"), 
+      axis.title = element_text(size = rel(1), hjust = 0.95, face = "italic"), 
       panel.grid.major = element_line(size = rel(.1), color = "grey70"), 
       panel.grid.minor = element_line(size = rel(.1), color = "grey70")
     )
@@ -73,21 +68,124 @@ my_theme <- function() {
 ```
 
 
-# Analysis and plots
+# Analyses and plots
 
-## Individual data
+Each year in November we do a series of time trials in which we have to row 
+for maximum distance in a set amount of time. The first week starts at 2 
+minutes and the time is increased by 1 minute each week. For every time 
+interval, each rower must complete 4 trials. This is the data from my 
+rowvember's from 2016 through 2018.
 
-### Total meters for Rowvember by year
+## Total meters for Rowvember by year
 
-```{r, 'total-meters-by-year', results='asis', echo=F}
+Over the course of the month we complete `r 4*4` rows, so the meters really 
+add up. Let's take a look at how much rowing actually goes down. 
+
+```{r, 'total-meters-by-year-plot', echo=F, fig.width=5.5, fig.height=3, out.extra='style="float:left"'}
+df_individual %>%
+  group_by(rower, year) %>% 
+  summarize(., total_meters = sum(distance)) %>%
+  ggplot(., aes(x = year, y = total_meters)) + 
+    geom_bar(stat = "identity", width = 0.05, fill = "grey60") + 
+    geom_point(aes(fill = factor(year)), pch = 21, size = 8, 
+               show.legend = F) + 
+    scale_x_continuous(breaks = seq(2016, 2018, 1), 
+                       labels = seq(2016, 2018, 1)) + 
+	scale_fill_brewer(palette = "Set1") + 
+    coord_cartesian(ylim = c(17100, 17700)) + 
+    labs(y = "Total meters rowed", x = "Year", 
+         title = "Rowvember analysis", 
+         subtitle = "Total meters rowed by year") + 
+    my_theme()
+```
+
+</br>
+</br>
+</br>
+
+```{r, 'total-meters-by-year-table', echo=F}
 # Total meters
 df_individual %>%
   group_by(rower, year) %>% 
-  summarize(., total = sum(distance)) %>%
-  datatable(.)
+  summarize(., total_meters = sum(distance), 
+               miles = (sum(distance) / 1609.344) %>% round(., 2)) %>%
+  ungroup(.) %>% 
+  select(-rower) %>% 
+  kable(., format = "html") %>% 
+  kable_styling(., bootstrap_options = c("hover", "condensed", "responsive"), 
+                   full_width = FALSE, position = 'center', font_size = 16) 
 ```
 
-### Total meters per week (row time)
+</br>
+</br>
+</br>
+
+In the last 3 years I have rowed a total of 
+`r sum(df_individual$distance) %>% format(., scientific = F)` meters! That's 
+`r (sum(df_individual$distance) / 1609.344) %>% round(., 2)` miles! 
+One thing I was interested in was finding out if I was doing more work 
+(rowing more distance) each year. Looking at the plot I see that I did indeed 
+row more meters each year (the height of the colored dots increases). 
+We can visualize the year to year improvement by subtracting the total meters 
+of a given year from those of the previous year. 
+
+```{r, 'total-improvement-by-year-plot', echo=F, fig.width=5.5, fig.height=3, out.extra='style="float:left"'}
+df_individual %>%
+  group_by(year) %>% 
+  summarise(., total = sum(distance)) %>% 
+  ungroup(.) %>% 
+  spread(., year, total) %>% 
+  mutate(., `16-17 difference` = `2017` - `2016`, 
+            `17-18 difference` = `2018` - `2017`) %>% 
+  select(., -`2016`, -`2017`, -`2018`) %>% 
+  gather(., year, diff) %>% 
+  ggplot(., aes(x = year, y = diff, fill = year)) + 
+    geom_hline(yintercept = 0, lty = 3, color = "black") + 
+    geom_bar(stat = "identity", width = 0.05, fill = "grey60", 
+             position = position_dodge(0.5)) + 
+    geom_point(pch = 21, size = 8, show.legend = FALSE) + 
+    ylim(0, 300) + 
+    scale_fill_brewer(palette = "Set1") + 
+    labs(y = "Meters", 
+         x = "", title = "Rowvember analysis", 
+         subtitle = "Yearly improvement in total meters rowed") + 
+    my_theme()
+```
+
+</br>
+</br>
+</br>
+</br>
+
+```{r, 'total-improvement-by-year-table', echo=F}
+df_individual %>%
+  group_by(year) %>% 
+  summarise(., total = sum(distance)) %>% 
+  ungroup(.) %>% 
+  spread(., year, total) %>% 
+  mutate(., `16-17` = `2017` - `2016`, 
+            `17-18` = `2018` - `2017`) %>% 
+  select(., -`2016`, -`2017`, -`2018`) %>% 
+  gather(., Year, Improvement) %>% 
+  kable(., format = "html") %>% 
+  kable_styling(., bootstrap_options = c("hover", "condensed", "responsive"), 
+                   full_width = FALSE, position = 'center', font_size = 16) 
+```
+
+</br>
+</br>
+</br>
+</br>
+
+This plot shows the difference in meters of total output from 2016 to 2017 and 
+from 2017 to 2018. I've rowed more total meters every year. Specifically, I 
+improved by 52 total meters from 2016 to 2017, and by 190(!) total meters from 
+2017 to 2018. Nice. 
+
+</br>
+</br>
+
+## Total meters per week (row time)
 
 ```{r, 'total-meters-weekly', echo=F}
 # Total meters per week 
@@ -98,7 +196,7 @@ df_individual %>%
   datatable(.)
 ```
 
-### Yearly improvement
+## Yearly improvement
 
 ```{r, 'yearly-improvement-table', echo=F, warning=F, fig.retina=2, fig.width=7, fig.align="center"}
 df_individual %>% 
@@ -131,7 +229,7 @@ df_individual %>%
     my_theme()
 ```
 
-### Average meters per round
+## Average meters per round
 
 ```{r}
 df_individual %>% 
@@ -141,7 +239,7 @@ df_individual %>%
 	datatable(.)
 ```
 
-### Fit model of meters as a function of time
+## Fit model of meters as a function of time
 
 ```{r, echo=FALSE, output='hide'}
 # Calculate mean value per time session and fit uncon. GCA 
@@ -164,7 +262,7 @@ fit <- lmer(distance ~ (ot1+ot2) + year +
 summary(fit)
 ```
 
-### Plots of meters as a function of time
+## Plots of meters as a function of time
 
 ```{r, fig.retina=2, fig.align='center', fig.width=8}
 # Plot avg distance for each time 
@@ -202,8 +300,10 @@ with(df_individual, scatter3D(x = trial, y = time, z = distance,
 
 
 
+</br></br></br></br></br></br></br></br></br>
+</br></br></br></br></br></br></br></br></br>
 
-## Group data
+# Group data
 
 ### Total meters (females)
 
