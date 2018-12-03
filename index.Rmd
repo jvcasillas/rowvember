@@ -3,15 +3,14 @@ title: 'Rowvember'
 author: 'Joseph V. Casillas'
 date: '`r Sys.time()`'
 output: 
-  html_document:
+  html_document: 
+    highlight: textmate
     number_sections: yes
-    theme: cosmo
+    theme: journal
     toc: yes
-editor_options: 
-  chunk_output_type: console
 ---
 
-```{r, echo=FALSE, message=FALSE, warning=FALSE}
+```{r, 'load-packages', echo=FALSE, message=FALSE, warning=FALSE}
 library(plot3D)
 library(plotly)
 library(lme4)
@@ -27,7 +26,7 @@ library(kableExtra)
 library(magrittr)
 ```
 
-```{r, echo=FALSE, message=FALSE}
+```{r, 'import-clean-data', echo=FALSE, message=FALSE}
 # Individual data
 df_individual <- read_csv("./data/rowvember.csv")
 
@@ -107,13 +106,26 @@ df_individual %>%
 # Total meters
 df_individual %>%
   group_by(rower, year) %>% 
-  summarize(., total_meters = sum(distance), 
+  summarize(., meters = sum(distance), 
                miles = (sum(distance) / 1609.344) %>% round(., 2)) %>%
   ungroup(.) %>% 
   select(-rower) %>% 
-  kable(., format = "html") %>% 
+  add_row(., year = "total", 
+             meters = sum(.$meters), 
+             miles = sum(.$miles)) %>% 
+  mutate(., year = if_else(year == "total", 
+              cell_spec(year, background = "lightgrey", color = "black"), 
+              cell_spec(year, background = "white")), 
+            meters = if_else(meters > 20000, 
+              cell_spec(meters, background = "lightgrey", color = "black"), 
+              cell_spec(meters, background = "white")), 
+            miles = if_else(miles > 20, 
+              cell_spec(miles, background = "lightgrey", color = "black"), 
+              cell_spec(miles, background = "white"))) %>% 
+  kable(., format = "html", escape = F) %>% 
   kable_styling(., bootstrap_options = c("hover", "condensed", "responsive"), 
-                   full_width = FALSE, position = 'center', font_size = 16) 
+                   full_width = FALSE, position = 'center', font_size = 16) %>% 
+  add_header_above(c(" ", "Totals" = 2))
 ```
 
 </br>
@@ -185,51 +197,130 @@ improved by 52 total meters from 2016 to 2017, and by 190(!) total meters from
 </br>
 </br>
 
-## Total meters per week (row time)
+## Total meters per time interval
 
-```{r, 'total-meters-weekly', echo=F}
+Rowvember can get pretty challenging because it involves 4 different row times. 
+For me, the 2-minute and 3-minute rows are a sprint, which I prefer, but the 
+3-minute row is torture. The 4 and 5-minute rows aren't easy, but I find them 
+to be less difficult (and less stressful) because I just focus on holding my 
+pace. Here I look at the total distance rowed each year as a function of the 
+time inverval (2, 3, 4, or 5 minutes). 
+
+```{r, 'total-meters-weekly-plot', echo=F, fig.width=5.5, fig.height=3, out.extra='style="float:left"'}
+df_individual %>%
+  group_by(., rower, year, time) %>%
+  summarise(., total = sum(distance)) %>% 
+  ggplot(., aes(x = year, y = total, dodge = factor(time))) + 
+    geom_bar(stat = "identity", position = position_dodge(0.5), width = 0.2, 
+             fill = "grey60") + 
+    geom_point(aes(fill = factor(time)), position = position_dodge(0.5), 
+               pch = 21, size = 7) + 
+    coord_cartesian(ylim = c(0, 8000)) + 
+    scale_fill_brewer(name = "Row time\n(minutes)", palette = "Set1") + 
+    scale_x_continuous(breaks = seq(2016, 2018, 1), 
+                       labels = seq(2016, 2018, 1)) + 
+    labs(y = "Meters", 
+         x = "", title = "Rowvember analysis", 
+         subtitle = "Total meters rowed per time interval for 2016-2018") + 
+    my_theme()
+```
+
+</br>
+
+```{r, 'total-meters-weekly-table', echo=F}
 # Total meters per week 
 df_individual %>%
   group_by(., rower, year, time) %>%
   summarise(., total = sum(distance)) %>% 
-  spread(., year, total) %>%
-  datatable(.)
+  spread(., year, total) %>% 
+  ungroup(.) %>% 
+  select(-rower) %>% 
+  rename(., "Row time" = time) %>% 
+  kable(., format = "html") %>% 
+  kable_styling(., bootstrap_options = c("hover", "condensed", "responsive"), 
+                   full_width = FALSE, position = 'center', font_size = 16) %>% 
+  add_header_above(c(" ", "Year" = 3))
 ```
 
-## Yearly improvement
+</br>
+</br>
+</br>
+</br>
 
-```{r, 'yearly-improvement-table', echo=F, warning=F, fig.retina=2, fig.width=7, fig.align="center"}
-df_individual %>% 
-  group_by(., rower, year, time) %>% 
+It's pretty clear that with each additional minute of row time the total 
+distance increases (big surprise). What may be more interesting is seeing 
+the difference in total meters rowed per time interval for each year, so, 
+again, we can subtract the total distance rowed from that of the previous 
+year, for each time interval. 
+
+
+
+
+```{r, 'total-improvement-by-interval-year-plot', echo=F, fig.width=6.25, fig.height=4, out.extra='style="float:left"'}
+
+tibiyp_caption <- "2016/17 and 2017/18 comparison of total distances for 2, 3, 4, and 5 minute rows"
+
+df_individual %>%
+  group_by(year, time) %>% 
   summarise(., total = sum(distance)) %>% 
+  ungroup(.) %>% 
   spread(., year, total) %>% 
   mutate(., `16-17 difference` = `2017` - `2016`, 
             `17-18 difference` = `2018` - `2017`) %>% 
-  select(., rower, time, starts_with("1")) %>% 
-  datatable(.)
-
-df_individual %>% 
-  group_by(., rower, year, time) %>% 
-  summarise(., total = sum(distance)) %>% 
-  spread(., year, total) %>% 
-  mutate(., `16-17 difference` = `2017` - `2016`, 
-            `17-18 difference` = `2018` - `2017`) %>% 
-  select(., rower, time, starts_with("1")) %>% 
-  gather(., year, diff, -rower, -time) %>% 
-  ggplot(., aes(x = year, y = diff, dodge = factor(time), 
-                fill = factor(time))) + 
+  select(., -`2016`, -`2017`, -`2018`) %>% 
+  gather(., year, diff, -time) %>% 
+  ggplot(., aes(x = year, y = diff, fill = factor(time), dodge = factor(time))) + 
     geom_hline(yintercept = 0, lty = 3, color = "black") + 
     geom_bar(stat = "identity", width = 0.2, fill = "grey60", 
              position = position_dodge(0.5)) + 
-    geom_point(pch = 21, size = 7, position = position_dodge(0.5)) + 
+    geom_point(pch = 21, size = 7, position = position_dodge(0.5)) +
+    coord_cartesian(ylim = c(-50, 125)) + 
     scale_fill_brewer(name = "Row time\n(minutes)", palette = "Set1") + 
-    labs(y = "Overall distance (m) difference", 
-         x = "", title = "Rowvember yearly improvement", 
-         subtitle = "Difference between 2016/17 and 2017/18 total distances for 2, 3, 4, and 5 minute rows") + 
+    labs(y = "Meters", 
+         x = "", title = "Rowvember analysis", 
+         subtitle = tibiyp_caption) + 
     my_theme()
 ```
 
-## Average meters per round
+</br>
+</br>
+</br>
+
+```{r, 'total-improvement-by-interval-year-table', echo=F}
+df_individual %>% 
+  group_by(., rower, year, time) %>% 
+  summarise(., total = sum(distance)) %>% 
+  spread(., year, total) %>% 
+  mutate(., `16-17` = `2017` - `2016`, 
+            `17-18` = `2018` - `2017`) %>% 
+  ungroup(.) %>% 
+  select(., "Row time" = time, starts_with("1")) %>% 
+  kable(., format = "html") %>% 
+  kable_styling(., bootstrap_options = c("hover", "condensed", "responsive"), 
+                   full_width = FALSE, position = 'center', font_size = 16) %>% 
+  add_header_above(c(" ", "Comparison" = 2))
+```
+
+</br>
+</br>
+</br>
+</br>
+</br>
+
+Text here
+
+
+
+
+
+
+
+
+
+
+
+
+## Average meters per time interval
 
 ```{r}
 df_individual %>% 
