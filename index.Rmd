@@ -10,25 +10,25 @@ output:
     toc: yes
 ---
 
+```{r setup}
+knitr::opts_chunk$set(echo=T, out.width="100%")
+```
+
 ```{r, 'load-packages', echo=FALSE, message=FALSE, warning=FALSE}
 library(plot3D)
 library(plotly)
-library(lme4)
-library(lmerTest)
-library(MuMIn)
 library(DT)
-library(stargazer)
 library(here)
 library(tidyverse)
-library(magrittr)
 library(knitr)
 library(kableExtra)
-library(magrittr)
+library(lubridate)
 ```
 
 ```{r, 'import-clean-data', echo=FALSE, message=FALSE}
 # Individual data
-df_individual <- read_csv("./data/rowvember.csv")
+df_individual <- read_csv("./data/rowvember.csv") %>% 
+  mutate(year = as.character(year))
 
 # Add to dataframe
 # df_individual <- rbind(df_individual, 
@@ -42,7 +42,7 @@ df_individual <- read_csv("./data/rowvember.csv")
 
 # Load all data
 temp <- list.files(path = "./data/", full.names = TRUE, pattern = ".csv")
-myfiles = lapply(temp[-1], read.csv, sep = ",")
+myfiles = lapply(temp[-c(1:3)], read.csv, sep = ",")
 df <- do.call("rbind", myfiles)
 
 df <- mutate(df, 
@@ -83,14 +83,12 @@ add up. Let's take a look at how much rowing actually goes down.
 ```{r, 'total-meters-by-year-plot', echo=F, fig.width=5.5, fig.height=3, out.extra='style="float:left"'}
 df_individual %>%
   group_by(rower, year) %>% 
-  summarize(., total_meters = sum(distance)) %>%
+  summarize(., total_meters = sum(distance), .groups = "drop") %>%
   ggplot(., aes(x = year, y = total_meters)) + 
     geom_bar(stat = "identity", width = 0.05, fill = "grey60") + 
     geom_point(aes(fill = factor(year)), pch = 21, size = 8, 
                show.legend = F) + 
-    scale_x_continuous(breaks = seq(2016, 2018, 1), 
-                       labels = seq(2016, 2018, 1)) + 
-	scale_fill_brewer(palette = "Set1") + 
+    scale_fill_brewer(palette = "Set1") + 
     coord_cartesian(ylim = c(17100, 17700)) + 
     labs(y = "Total meters rowed", x = "Year", 
          title = "Rowvember analysis", 
@@ -107,7 +105,8 @@ df_individual %>%
 df_individual %>%
   group_by(rower, year) %>% 
   summarize(., meters = sum(distance), 
-               miles = (sum(distance) / 1609.344) %>% round(., 2)) %>%
+               miles = (sum(distance) / 1609.344) %>% round(., 2), 
+               .groups = "drop") %>%
   ungroup(.) %>% 
   select(-rower) %>% 
   add_row(., year = "total", 
@@ -144,8 +143,7 @@ of a given year from those of the previous year.
 ```{r, 'total-improvement-by-year-plot', echo=F, fig.width=5.5, fig.height=3, out.extra='style="float:left"'}
 df_individual %>%
   group_by(year) %>% 
-  summarise(., total = sum(distance)) %>% 
-  ungroup(.) %>% 
+  summarise(., total = sum(distance), .groups = "drop") %>% 
   spread(., year, total) %>% 
   mutate(., `16-17 difference` = `2017` - `2016`, 
             `17-18 difference` = `2018` - `2017`) %>% 
@@ -172,8 +170,7 @@ df_individual %>%
 ```{r, 'total-improvement-by-year-table', echo=F}
 df_individual %>%
   group_by(year) %>% 
-  summarise(., total = sum(distance)) %>% 
-  ungroup(.) %>% 
+  summarise(., total = sum(distance), .groups = "drop") %>% 
   spread(., year, total) %>% 
   mutate(., `16-17` = `2017` - `2016`, 
             `17-18` = `2018` - `2017`) %>% 
@@ -204,12 +201,12 @@ For me, the 2-minute and 3-minute rows are a sprint, which I prefer, but the
 3-minute row is torture. The 4 and 5-minute rows aren't easy, but I find them 
 to be less difficult (and less stressful) because I just focus on holding my 
 pace. Here I look at the total distance rowed each year as a function of the 
-time inverval (2, 3, 4, or 5 minutes). 
+time intverval (2, 3, 4, or 5 minutes). 
 
 ```{r, 'total-meters-weekly-plot', echo=F, fig.width=5.5, fig.height=3, out.extra='style="float:left"'}
 df_individual %>%
   group_by(., rower, year, time) %>%
-  summarise(., total = sum(distance)) %>% 
+  summarise(., total = sum(distance), .groups = "drop") %>% 
   ggplot(., aes(x = year, y = total, dodge = factor(time))) + 
     geom_bar(stat = "identity", position = position_dodge(0.5), width = 0.2, 
              fill = "grey60") + 
@@ -217,8 +214,6 @@ df_individual %>%
                pch = 21, size = 7) + 
     coord_cartesian(ylim = c(0, 8000)) + 
     scale_fill_brewer(name = "Row time\n(minutes)", palette = "Set1") + 
-    scale_x_continuous(breaks = seq(2016, 2018, 1), 
-                       labels = seq(2016, 2018, 1)) + 
     labs(y = "Meters", 
          x = "", title = "Rowvember analysis", 
          subtitle = "Total meters rowed per time interval for 2016-2018") + 
@@ -231,9 +226,8 @@ df_individual %>%
 # Total meters per week 
 df_individual %>%
   group_by(., rower, year, time) %>%
-  summarise(., total = sum(distance)) %>% 
+  summarise(., total = sum(distance), .groups = "drop") %>% 
   spread(., year, total) %>% 
-  ungroup(.) %>% 
   select(-rower) %>% 
   rename(., "Row time" = time) %>% 
   kable(., format = "html") %>% 
@@ -262,8 +256,7 @@ tibiyp_caption <- "2016/17 and 2017/18 comparison of total distances for 2, 3, 4
 
 df_individual %>%
   group_by(year, time) %>% 
-  summarise(., total = sum(distance)) %>% 
-  ungroup(.) %>% 
+  summarise(., total = sum(distance), .groups = "drop") %>% 
   spread(., year, total) %>% 
   mutate(., `16-17 difference` = `2017` - `2016`, 
             `17-18 difference` = `2018` - `2017`) %>% 
@@ -289,7 +282,7 @@ df_individual %>%
 ```{r, 'total-improvement-by-interval-year-table', echo=F}
 df_individual %>% 
   group_by(., rower, year, time) %>% 
-  summarise(., total = sum(distance)) %>% 
+  summarise(., total = sum(distance), .groups = "drop") %>% 
   spread(., year, total) %>% 
   mutate(., `16-17` = `2017` - `2016`, 
             `17-18` = `2018` - `2017`) %>% 
@@ -325,7 +318,8 @@ Text here
 ```{r}
 df_individual %>% 
 	group_by(., rower, time) %>% 
-	summarize(., avg_distance = mean(distance), sd_distance = sd(distance)) %>% 
+	summarize(., avg_distance = mean(distance), sd_distance = sd(distance), 
+		.groups = "drop") %>% 
 	mutate_if(., is.numeric, round, digits = 2) %>% 
 	datatable(.)
 ```
@@ -346,7 +340,7 @@ df_individual[df_individual$time == 3, 'ot2'] <- t[2, 2]
 df_individual[df_individual$time == 4, 'ot2'] <- t[3, 2]
 df_individual[df_individual$time == 5, 'ot2'] <- t[4, 2]
 
-fit <- lmer(distance ~ (ot1+ot2) + year + 
+fit <- lme4::lmer(distance ~ (ot1+ot2) + year + 
            ((ot1+ot2) | trial) + 
            ((ot1 + ot2) | year), 
             data = df_individual, REML = FALSE)
@@ -362,9 +356,9 @@ df_individual %>%
   geom_point(position = position_dodge(0.5), size = 4, alpha = 0.3) + 
   stat_summary(fun.data = mean_sdl, geom = 'pointrange', 
   						 position = position_dodge(0.5)) + 
-  stat_summary(fun.y = mean, geom = 'point', size = 2, 
+  stat_summary(fun = mean, geom = 'point', size = 2, 
   						 position = position_dodge(0.5)) + 
-  stat_summary(aes(y = fitted(fit)), fun.y = mean, geom = 'line') + 
+  stat_summary(aes(y = fitted(fit)), fun = mean, geom = 'line') + 
   scale_x_continuous(breaks = c(2, 3, 4, 5), 
                      labels = c('2min', '3min', '4min', '5min')) +
 	ylim(500, 1700) + 
@@ -403,7 +397,7 @@ with(df_individual, scatter3D(x = trial, y = time, z = distance,
 df %>%
   filter(., group == 'female') %>%
   group_by(., athlete, group) %>%
-  summarise(., totalM = sum(distance)) %>%
+  summarise(., totalM = sum(distance), .groups = "drop") %>%
   arrange(., group, desc(totalM)) %>%
   as.data.frame(.) %>%
   datatable(.)
@@ -416,7 +410,7 @@ df %>%
 df %>%
   filter(., group == 'male') %>%
   group_by(., athlete, group) %>%
-  summarise(., totalM = sum(distance)) %>%
+  summarise(., totalM = sum(distance), .groups = "drop") %>%
   arrange(., group, desc(totalM)) %>%
   as.data.frame(.) %>%
   datatable(.)
@@ -428,7 +422,7 @@ df %>%
 # Total meters by time
 df %>%
   group_by(., athlete, group, time) %>%
-  summarise(., totalM = sum(distance)) %>%
+  summarise(., totalM = sum(distance), .groups = "drop") %>%
   arrange(., group, desc(totalM)) %>%
   by(., .[c("group", "time")], head, n = 10)
 ```
@@ -439,9 +433,9 @@ df %>%
 # Avg meters by gender 
 df %>%
   group_by(., athlete, group) %>%
-  summarise(., totalM = sum(distance)) %>%
+  summarise(., totalM = sum(distance), .groups = "drop") %>%
   group_by(., group) %>%
-  summarise(., avg = round(mean(totalM), 2)) %>%
+  summarise(., avg = round(mean(totalM), 2), .groups = "drop") %>%
   datatable(.)
 ```
 
@@ -451,15 +445,15 @@ df %>%
 # Plot total meters of top 10 overall
 df %>%
   group_by(., athlete, group) %>%
-  summarise(., totalM = sum(distance)) %>%
+  summarise(., totalM = sum(distance), .groups = "drop") %>%
   arrange(., group, desc(totalM)) %>%
   by(., .["group"], head, n = 10) %>%
   Reduce(rbind, .) %>%
   ggplot(., aes(x = group, y = totalM, label = athlete, colour = group)) + 
   stat_summary(fun.data = mean_cl_boot, geom = 'errorbar', width = 0.2) + 
-  stat_summary(fun.y = mean, geom = 'point', color = 'Black') + 
+  stat_summary(fun = mean, geom = 'point', color = 'Black') + 
   geom_text(alpha = 0.4) + 
-  scale_color_brewer(palette = 'Set1', guide = FALSE) + 
+  scale_color_brewer(palette = 'Set1', guide = "none") + 
   theme_bw()
 ```
 
@@ -475,9 +469,9 @@ df %>%
   ggplot(., aes(x = trial, y = distance, shape = group, label = athlete)) + 
   facet_grid(. ~ time) + 
   stat_summary(aes(colour = group), fun.data = mean_cl_normal, geom = 'errorbar', width = 0.2) + 
-  stat_summary(fun.y = mean, geom = 'point') + 
+  stat_summary(fun = mean, geom = 'point') + 
   geom_text(aes(colour = group), alpha = 0.3) + 
-  scale_color_brewer(palette = 'Set1', guide = FALSE) + 
+  scale_color_brewer(palette = 'Set1', guide = "none") + 
   theme_bw()
 ```
 
@@ -485,21 +479,20 @@ df %>%
 # Build some models 
 df$timeCentered <- df$time - mean(df$time)
 df$trial <- as.numeric(df$trial)
-fit_null <- lmer(distance ~ 1 + (time | athlete) + (trial | athlete), data = df, REML = FALSE)
-fit_1    <- lmer(distance ~ 1 + time + (time | athlete) + (trial | athlete), data = df, REML = FALSE)
-fit_2    <- lmer(distance ~ 1 + time + group + (time | athlete) + (trial | athlete), data = df, REML = FALSE)
-fit_full <- lmer(distance ~ 1 + time * group + (time | athlete) + (trial | athlete), data = df, REML = FALSE)
+fit_null <- lme4::lmer(distance ~ 1 + (time | athlete) + (trial | athlete), data = df, REML = FALSE)
+fit_1    <- lme4::lmer(distance ~ 1 + time + (time | athlete) + (trial | athlete), data = df, REML = FALSE)
+fit_2    <- lme4::lmer(distance ~ 1 + time + group + (time | athlete) + (trial | athlete), data = df, REML = FALSE)
+fit_full <- lme4::lmer(distance ~ 1 + time * group + (time | athlete) + (trial | athlete), data = df, REML = FALSE)
 anova(fit_null, fit_1, fit_2, fit_full, test = 'Chisq')
 summary(fit_full)
-r.squaredGLMM(fit_full)
 
 
 df %>%
   ggplot(., aes(x = time, y = distance, colour = group, shape = group)) + 
   geom_jitter(alpha = 0.4) + 
-  stat_summary(aes(y = fitted(fit_full)), fun.y = mean, geom = 'line') + 
+  stat_summary(aes(y = fitted(fit_full)), fun = mean, geom = 'line') + 
   stat_summary(fun.data = mean_cl_boot, geom = 'pointrange') +
-  stat_summary(fun.y = mean, geom = 'point', color = 'black') + 
+  stat_summary(fun = mean, geom = 'point', color = 'black') + 
   scale_color_brewer(palette = 'Set1') + 
   theme_bw()
 ```
@@ -515,3 +508,215 @@ with(df, scatter3D(x = trial, y = time, z = distance,
 
 
 
+
+# 2019
+
+```{r load-2019}
+dat2019 <- read_csv(here("data", "rowvember2019.csv")) %>% 
+  mutate(time = hms(time) %>% as.duration())
+```
+
+```{r plots2019}
+dat2019 %>% 
+  ggplot(., aes(x = gender, y = time, color = gender)) + 
+    facet_wrap(~ trial, scales = "free_y") + 
+    geom_text(aes(label = rower), show.legend = F, hjust = 0.5)
+```
+
+
+# 2021
+
+```{r load-2021}
+dat2021 <- read_csv(here("data", "rowvember2021.csv")) %>% 
+  mutate(time = hms(time) %>% as.duration())
+```
+
+```{r plots2021}
+dat2021 %>% 
+  ggplot(., aes(x = gender, y = time, color = gender)) + 
+    facet_wrap(~ trial, scales = "free_y") + 
+    geom_text(aes(label = rower), show.legend = F, hjust = 0.5)
+```
+
+
+# 2019-2021 comparison
+
+```{r, combine-dfs}
+dat201921 <- bind_rows(dat2019, dat2021) %>% 
+  separate(date, into = c("month", "day", "year"), sep = "/")
+```
+
+```{r comp-plots}
+dat201921 %>% 
+  mutate(is_casillas = 
+    if_else(rower == "Joseph Casillas", "Casillas", "Other")) %>% 
+  ggplot(., aes(x = year, y = time, fill = gender)) + 
+    facet_wrap(. ~ trial, scales = "free_y", ncol = 4) + 
+    geom_point(position = position_dodge(0.75), 
+      size = 3, shape = 21, alpha = 0.5, color = "white") +
+    stat_summary(fun.data = mean_se, geom = "pointrange", pch = 21, 
+      position = position_dodge(0.75), size = 0.9) + 
+    scale_fill_viridis_d(name = NULL, option = "A", begin = 0.4, end = 0.85) + 
+   # scale_shape_manual(values = c(21, 24), guide = "none") + 
+    labs(title = "Rowevember", 
+      subtitle = "Time as a function of distance for 2019 and 2021", 
+      y = "Time in seconds", x = NULL) + 
+    ds4ling::ds4ling_bw_theme() + 
+    theme(legend.position = "bottom")
+
+dat201921 %>% 
+  filter(rower != "Joseph Casillas") %>% 
+  ggplot(., aes(x = year, y = time, fill = gender)) + 
+    facet_wrap(. ~ trial, scales = "free_y", ncol = 4) + 
+    geom_point(position = position_dodge(0.75), 
+      size = 3, shape = 21, alpha = 0.5, color = "white") + 
+    geom_point(data = filter(dat201921, rower == "Joseph Casillas"), 
+      pch = 24, fill = "#cc0033", size = 3) + 
+    stat_summary(fun.data = mean_se, geom = "pointrange", pch = 21, 
+      position = position_dodge(0.75), size = 0.9) + 
+    scale_fill_viridis_d(name = NULL, option = "A", begin = 0.4, end = 0.85) + 
+    scale_shape_manual(values = c(21, 24), guide = "none") + 
+    labs(title = "Rowevember", 
+      subtitle = "Time as a function of distance for 2019 and 2021 (red triangle = Casillas)", 
+      y = "Time in seconds", x = NULL) + 
+    ds4ling::ds4ling_bw_theme(base_family = "Times") + 
+    theme(legend.position = "bottom")
+
+```
+
+
+```{r, tests, out.width="100%"}
+
+pace_to_time <- function(pace, distance = 500) {
+  if (is.character(pace)) {
+   stop("You messed up")
+  } else {
+  min <- strex::str_nth_number(as.character(pace), n = 1)
+  sec <- strex::str_nth_number(as.character(pace), n = 2)
+  min_to_sec <- min * 60
+  time_in_secs <- min_to_sec + sec
+  total_sec <- time_in_secs * distance / 500
+  estimated_time <- lubridate::seconds_to_period(total_sec)
+  return(estimated_time)
+  }
+}
+
+pace_to_time(pace = c(ms("2:49"), ms("2:49")), distance = 5000)
+
+
+
+# Paces for 2021
+#
+# 1000 = 1:39
+# 2000 = 1:41
+# 3000 = 1:47
+# 5000 = 1:51
+
+# data frame of time course
+time_course <- crossing(
+  min = seq(0, 30, 1), 
+  sec = seq(0, 59, 1)
+  ) %>% 
+  unite(min_sec, min, sec, sep = ":") %>% 
+  mutate(min_sec = ms(min_sec))
+
+
+estimates <- tibble(
+  paces = seq(ms("1:40"), ms("1:58"), ms("0:02")), 
+  pace_t = as.numeric(as.duration(ms(paces))), 
+  distance = 5000
+  ) %>% 
+  crossing(., time_course) %>% 
+  mutate(
+    estimated_finish = pace_to_time(paces, distance), 
+    progress = min_sec / estimated_finish) %>% 
+  mutate(progress = if_else(progress >= 1, 1, .$progress), 
+    time_course = as.duration(min_sec), 
+    current_distance = (500 / pace_t) * as.numeric(min_sec), 
+    paces = as.character(paces))
+
+main_plot <- estimates %>% 
+  ggplot(., aes(x = min_sec, y = progress)) + 
+    geom_path(aes(color = paces)) + 
+    labs(y = "Progress", x = "Elapsed time (hms)", 
+      title = "Rowvember", subtitle = "5k pacing estimates") + 
+    scale_color_viridis_d(name = "500m split", option = "C", 
+      begin = 0.1, direction = -1) + 
+    scale_x_time() + 
+    hrbrthemes::scale_y_percent() + 
+    coord_cartesian(xlim = c(NA, 1200), ylim = c(NA, 1.01)) + 
+    ggdark::dark_theme_bw()
+
+inset_plot <- main_plot + 
+  coord_cartesian(ylim = c(0.8, 1.01), xlim = c(920, 1180)) + 
+  scale_x_time(breaks = c(960, 1050, 1140)) + 
+  labs(title = NULL, subtitle = NULL, y = NULL, x = NULL) + 
+  theme(legend.position = "none")
+
+## Add it as an inset
+main_plot + annotation_custom(
+  grob = ggplotGrob(inset_plot), 
+  ymin = 0, ymax = 0.5, xmin = 595, xmax = 1250)
+
+estimates %>% 
+  filter(current_distance <= 5000) %>% 
+  ggplot(., aes(x = progress, y = min_sec)) + 
+    geom_path(aes(color = paces), size = 1) + 
+    labs(x = "Progress", y = "Elapsed time (hms)", 
+      title = "Rowvember", subtitle = "5k pacing estimates") + 
+    scale_color_viridis_d(name = "500m split", option = "C", 
+      begin = 0.1, direction = -1) + 
+    scale_y_time() + 
+    hrbrthemes::scale_x_percent() + 
+    coord_cartesian(ylim = c(660, 1225), xlim = c(0.7, 1.01)) + 
+    ggdark::dark_theme_bw()
+
+```
+
+
+
+
+```{r, kelly-pace}
+
+
+pace_to_time(ms("2:00"), 5000)
+
+k_estimates <- tibble(
+  paces = seq(ms("2:10"), ms("2:26"), ms("0:02")), 
+  pace_t = as.numeric(as.duration(ms(paces))), 
+  distance = 5000
+  ) %>% 
+  crossing(., time_course) %>% 
+  mutate(
+    estimated_finish = pace_to_time(paces, distance), 
+    progress = min_sec / estimated_finish) %>% 
+  mutate(progress = if_else(progress >= 1, 1, .$progress), 
+    time_course = as.duration(min_sec), 
+    current_distance = (500 / pace_t) * as.numeric(min_sec), 
+    paces = as.character(paces))
+
+main_plot <- k_estimates %>% 
+  ggplot(., aes(x = min_sec, y = progress)) + 
+    geom_path(aes(color = paces)) + 
+    labs(y = "Progress", x = "Elapsed time (hms)", 
+      title = "Rowvember", subtitle = "5k pacing estimates") + 
+    scale_color_viridis_d(name = "500m split", option = "C", 
+      begin = 0.1, direction = -1) + 
+    scale_x_time() + 
+    hrbrthemes::scale_y_percent() + 
+    coord_cartesian(xlim = c(NA, 1500), ylim = c(NA, 1.01)) + 
+    ggdark::dark_theme_bw()
+
+inset_plot <- main_plot + 
+  coord_cartesian(ylim = c(0.85, 1.01), xlim = c(1260, 1460)) + 
+  scale_x_time() + 
+  labs(title = NULL, subtitle = NULL, y = NULL, x = NULL) + 
+  theme(legend.position = "none")
+
+## Add it as an inset
+main_plot + annotation_custom(
+  grob = ggplotGrob(inset_plot), 
+  ymin = 0, ymax = 0.5, xmin = 750, xmax = 1550)
+
+
+```
